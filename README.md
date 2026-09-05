@@ -1,173 +1,95 @@
-# RAID: AI Payment Recovery Control Plane
+# RAID — AI Revenue Recovery Control Plane
 
-> **Recover revenue. Never recover recklessly.**
+RAID is a hackathon prototype for the Razorpay AI Revenue Recovery track. It demonstrates an agentic loop that detects revenue at risk, reconstructs ambiguous payment states, diagnoses root cause, selects a bounded intervention, verifies the outcome, and records an audit trail.
 
-RAID is an AI-powered payment recovery system that handles **ambiguous payment states** and decides whether to **RECOVER, VERIFY, ESCALATE, or DO NOT RETRY**.
+## Demo positioning
+- **AI reasons, policy controls money.**
+- Synthetic batch metrics demonstrate measured recovery instead of a single cherry-picked transaction.
+- **Razorpay webhook adapter is implemented:** `payment.failed`, `payment.authorized`, and `payment.captured` are accepted at `/api/razorpay/webhook`. The server validates `x-razorpay-signature` with HMAC-SHA256 over the raw request body and uses `x-razorpay-event-id` for idempotent processing when Supabase is configured.
+- The browser never receives Razorpay secrets; live webhook validation is enabled only when `RAZORPAY_WEBHOOK_SECRET` is configured server-side. The demo itself remains test-mode/synthetic.
 
-Instead of blindly retrying failed payments, RAID reconstructs the payment event sequence, reasons about uncertainty, estimates risk, and applies a deterministic policy before any financial action.
-
-### Core Flow
-
-```text
-OBSERVE → RECONSTRUCT → REASON → PREDICT → POLICY GATE → ACT / VERIFY → AUDIT
-```
-
-### Key Idea
-
-**AI recommends. Deterministic policy controls money.**
-
-RAID is designed to prevent duplicate charges and unsafe recovery while maximizing **safe recovered revenue**.
-
----
-
-## 🚀 Features
-
-* AI-based payment-state reconstruction
-* Duplicate-payment risk detection
-* Recovery / Verify / Escalate decision engine
-* Deterministic financial policy gate
-* Counterfactual recovery analysis
-* Razorpay Test Mode integration
-* Webhook signature verification & deduplication
-* Audit trail with Supabase
-* Reproducible synthetic 10K transaction benchmark
-* Safe simulated recovery for evaluation
-
----
-
-## 🏗️ Architecture
-
-```text
-Payment Events
-      ↓
-State Reconstruction
-      ↓
-AI Reasoning + Risk
-      ↓
-Policy Engine
-      ↓
-┌─────┼─────────┐
-↓     ↓         ↓
-Recover Verify Escalate
-      ↓
-Razorpay Adapter
-      ↓
-Verification
-      ↓
-Audit Trail
-```
-
----
-
-## 🛠️ Tech Stack
-
-* **Next.js / React**
-* **Node.js**
-* **OpenAI API**
-* **Razorpay APIs & Webhooks**
-* **Supabase / PostgreSQL**
-* **Tailwind CSS**
-
----
-
-## ⚡ Run Locally
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/<your-username>/raid-ai-payment-recovery.git
-cd raid-ai-payment-recovery
-```
-
-### 2. Install dependencies
-
+## Run
 ```bash
 npm install
-```
-
-### 3. Configure environment variables
-
-Create `.env.local`:
-
-```env
-OPENAI_API_KEY=your_key
-
-RAZORPAY_KEY_ID=your_key
-RAZORPAY_KEY_SECRET=your_secret
-RAZORPAY_WEBHOOK_SECRET=your_secret
-
-NEXT_PUBLIC_SUPABASE_URL=your_url
-SUPABASE_SERVICE_ROLE_KEY=your_key
-```
-
-> Never commit `.env.local`. Use `.env.example` as the template.
-
-### 4. Start the application
-
-```bash
 npm run dev
 ```
 
-Open **http://localhost:3000**
-
----
-
-## 🧪 Evaluation
-
-RAID includes a reproducible synthetic benchmark:
-
+## Build
 ```bash
-POST /api/evaluate
+npm run build
+npm start
 ```
 
-Example:
-
-```bash
-curl -X POST http://localhost:3000/api/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{"count":10000,"seed":42}'
-```
-
-The benchmark measures:
-
-* Decision accuracy
-* Recovery rate
-* Revenue at risk
-* Recovered value
-* Unsafe actions blocked
-* Escalation rate
-* Decision latency
-
-**No real customer funds are moved during evaluation.**
-
----
-
-## 🔐 Safety
-
-RAID does not allow the LLM to directly control financial actions.
-
-```text
-AI Recommendation
-       ↓
-Deterministic Policy
-       ↓
-Bounded Execution
-       ↓
-Verification
-```
-
-Low confidence or high duplicate risk results in **verification or escalation**, not blind recovery.
-
----
-
-## 🌐 Demo
-
-**Live:** https://raid-v4.vercel.app/
-
-**Built for:** Razorpay AI Buildathon
-
-> **Most systems ask: "How do we recover this payment?"**
->
-> **RAID asks: "What is the safest action given everything we know?"**
+## Important
+The UI's recovery numbers are synthetic evaluation/demo values. Do not present them as production Razorpay results. The prototype does not contain real payment credentials or production payment execution.
 
 
+## Backend upgrade
+
+RAID now includes a server-side API/control layer under `app/api` and reusable services under `lib`. The browser never receives Razorpay secrets or the Supabase service-role key.
+
+### Server endpoints
+- `GET /api/health`
+- `POST /api/analyze` — diagnosis + deterministic policy gate + audit
+- `POST /api/recover` — policy-gated execution adapter
+- `POST /api/verify` — Razorpay payment status verification
+- `POST /api/razorpay/webhook` — HMAC validation + webhook idempotency
+
+### Database
+Run `supabase/schema.sql` in Supabase. Tables: `transactions`, `webhook_events`, `recovery_attempts`, `audit_logs`.
+
+### Environment
+Copy `.env.example` to your deployment settings. Use Razorpay **Test Mode** credentials only for the buildathon demo.
+
+### Recovery safety
+RAID does not let the AI directly move money. `lib/policy.js` is the final authority. For an authorized Razorpay payment, the adapter can capture after policy approval. For a failed payment, the adapter creates a bounded retry Order rather than silently charging the customer; a customer/payment flow must still complete that new order. Razorpay's capture API only changes an authorized payment to captured.
+
+
+## Deploy to Vercel — shortlist/demo checklist
+
+1. Push this folder to GitHub.
+2. Import the repository into Vercel as a **Next.js** project.
+3. Keep the build command as `next build`.
+4. For the no-credential demo, deploy with no environment variables: the UI and deterministic safety fallback still work.
+5. For the full test-mode integration, add these Vercel environment variables under **Settings → Environment Variables**:
+   - `RAZORPAY_KEY_ID`
+   - `RAZORPAY_KEY_SECRET`
+   - `RAZORPAY_WEBHOOK_SECRET`
+   - `OPENAI_API_KEY` (optional; without it RAID uses the deterministic fallback)
+   - `OPENAI_MODEL` (optional, defaults to `gpt-5-mini`)
+   - `SUPABASE_URL` (optional)
+   - `SUPABASE_SERVICE_ROLE_KEY` (optional)
+   - `MAX_RETRY_AMOUNT_INR=10000`
+   - `MIN_RECOVERY_CONFIDENCE=0.85`
+   - `MAX_DUPLICATE_RISK=0.20`
+6. Redeploy after changing environment variables.
+
+### Jury demo path
+
+**Hero → Run recovery batch → Decision Simulator → Run reconstruction → Why did RAID choose this? → Failure Lab → Razorpay Integration → Audit Trail.**
+
+The product intentionally labels synthetic evaluation values as synthetic. Never claim synthetic metrics are live Razorpay production metrics.
+
+### Razorpay Test-mode webhook integration
+
+Configure a Razorpay **Test Mode** webhook to POST events to:
+
+`/api/razorpay/webhook`
+
+Supported payment lifecycle events:
+- `payment.failed` — records the failed payment state for diagnosis/recovery decisions.
+- `payment.authorized` — preserves authorization evidence so RAID can block an unsafe retry.
+- `payment.captured` — records successful settlement evidence for verification.
+
+**Security:** RAID verifies the `x-razorpay-signature` header using HMAC-SHA256 over the exact raw webhook body and `RAZORPAY_WEBHOOK_SECRET`. **Idempotency:** `x-razorpay-event-id` is checked against the `webhook_events` table before processing a duplicate event. This keeps repeated delivery from creating duplicate transaction records.
+
+The UI may show `IMPLEMENTED · SECRET REQUIRED` when no secret is configured. That is a configuration state, not a missing integration: the adapter and verification logic are already in the repository.
+
+## Decision optimization
+RAID now includes a counterfactual endpoint (`POST /api/counterfactual`) that compares RECOVER NOW, VERIFY FIRST and ESCALATE using expected value and duplicate-risk cost. It is decision support only; it never moves money.
+
+## Benchmark
+`POST /api/evaluate` generates a reproducible 10,000-event synthetic universe (seed 42), runs an explainable risk model + deterministic policy engine on every record, and compares RAID against a naive recovery baseline. The UI loads with a precomputed seed-42 result for judge visibility, and the button reruns the same benchmark server-side. Benchmark recovery is simulated and safe; it never represents production Razorpay performance.
+
+## Architecture upgrade (v3)
+The decision path is now Observe → Reconstruct → Diagnose → Predict → Policy Gate → Verify. The counterfactual endpoint estimates expected value for Recover Now, Verify First and Escalate so the system can explain not only what it recommends, but why alternative actions are worse.
