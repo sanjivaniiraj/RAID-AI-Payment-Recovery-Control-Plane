@@ -1,4 +1,4 @@
-# RAID — AI Revenue Recovery Control Plane
+# RAID AI : Revenue Recovery Control Plane
 
 RAID is a hackathon prototype for the Razorpay AI Revenue Recovery track. It demonstrates an agentic loop that detects revenue at risk, reconstructs ambiguous payment states, diagnoses root cause, selects a bounded intervention, verifies the outcome, and records an audit trail.
 
